@@ -418,7 +418,7 @@ const PACKAGE_FORM_FACTORS = {
 };
 
 const FACT_ICONS = {
-  Package: 'mdi-package-variant-closed',
+  'Chip Variant': 'mdi-chip',
   Revision: 'mdi-update',
   'Embedded Flash': 'mdi-memory',
   'Embedded PSRAM': 'mdi-chip',
@@ -427,6 +427,7 @@ const FACT_ICONS = {
   'Flash ID': 'mdi-barcode',
   'Flash Manufacturer': 'mdi-domain',
   'Flash Device': 'mdi-chip',
+  'Package Form Factor': 'mdi-package-variant-closed',
 };
 
 function formatBytes(bytes) {
@@ -714,7 +715,7 @@ async function connect() {
     };
 
     const packageLabel = resolvePackageLabel(chipKey, packageVersion, chipRevision);
-    pushFact('Package', packageLabel);
+    pushFact('Chip Variant', packageLabel);
     const packageMatch = packageLabel?.match(/\(([^)]+)\)$/);
     if (packageMatch) {
       const detail = PACKAGE_FORM_FACTORS[packageMatch[1]];
