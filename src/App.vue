@@ -3,33 +3,74 @@
     <v-main>
       <v-container class="py-10" max-width="1100">
         <v-card elevation="8" class="pa-6">
-          <v-card-title class="d-flex flex-column align-start pa-0 mb-4">
-            <div class="d-flex align-center w-100">
-              <div class="text-h5 font-weight-semibold">ESP32 Web Flasher</div>
-              <v-spacer />
-              <v-btn
-                :title="`Switch to ${isDarkTheme ? 'light' : 'dark'} theme`"
-                variant="text"
-                icon
-                color="primary"
-                size="small"
-                @click="toggleTheme"
-              >
-                <v-icon>{{ themeIcon }}</v-icon>
-              </v-btn>
-              <v-chip
-                :color="connected ? 'success' : 'grey'"
-                :prepend-icon="connected ? 'mdi-usb-port' : 'mdi-usb-off'"
-                class="text-capitalize ms-2"
-                variant="flat"
-              >
-                {{ connected ? 'Connected' : 'Disconnected' }}
-              </v-chip>
-            </div>
-            <div class="text-body-2 text-medium-emphasis mt-2">
-              {{ statusLabel }}
-            </div>
+          <v-card-title class="d-flex align-center pa-0 mb-2">
+            <div class="text-h5 font-weight-semibold">ESP32 Web Flasher</div>
+            <v-spacer />
+            <v-btn
+              :title="`Switch to ${isDarkTheme ? 'light' : 'dark'} theme`"
+              variant="text"
+              icon
+              color="primary"
+              size="small"
+              @click="toggleTheme"
+            >
+              <v-icon>{{ themeIcon }}</v-icon>
+            </v-btn>
           </v-card-title>
+
+          <v-system-bar
+            class="status-bar mb-4"
+            color="surface-variant"
+            :height="64"
+            window
+          >
+            <div class="d-flex align-center gap-2 flex-wrap">
+              <v-btn
+                color="primary"
+                variant="flat"
+                density="comfortable"
+                :disabled="!serialSupported || connected || busy"
+                @click="connect"
+              >
+                <v-icon start>mdi-usb-flash-drive</v-icon>
+                Connect
+              </v-btn>
+              <v-btn
+                color="secondary"
+                variant="outlined"
+                density="comfortable"
+                :disabled="!connected || busy"
+                @click="disconnect"
+              >
+                <v-icon start>mdi-close-circle</v-icon>
+                Disconnect
+              </v-btn>
+              <v-select
+                v-model="selectedBaud"
+                :items="baudrateOptions"
+                label="Baud rate"
+                density="compact"
+                variant="outlined"
+                hide-details
+                class="status-select"
+                :disabled="busy"
+              />
+              <v-divider vertical class="mx-4" />
+              <div class="text-body-2 text-medium-emphasis">
+                {{ statusLabel }}
+              </div>
+            </div>
+            <v-spacer />
+            <v-chip
+              :color="connected ? 'success' : 'grey-darken-1'"
+              :prepend-icon="connected ? 'mdi-usb-port' : 'mdi-usb-off'"
+              class="text-capitalize"
+              variant="elevated"
+              density="comfortable"
+            >
+              {{ connected ? 'Connected' : 'Disconnected' }}
+            </v-chip>
+          </v-system-bar>
 
           <v-alert
             v-if="!serialSupported"
@@ -40,43 +81,6 @@
           >
             This browser does not support the Web Serial API. Use Chrome, Edge, or another Chromium-based browser.
           </v-alert>
-
-          <v-row align="center" class="mb-4" dense>
-            <v-col cols="12" md="4">
-              <v-btn
-                color="primary"
-                block
-                size="large"
-                :disabled="!serialSupported || connected || busy"
-                @click="connect"
-              >
-                <v-icon start>mdi-usb-flash-drive</v-icon>
-                Connect
-              </v-btn>
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-btn
-                color="secondary"
-                block
-                size="large"
-                variant="tonal"
-                :disabled="!connected || busy"
-                @click="disconnect"
-              >
-                <v-icon start>mdi-close-circle</v-icon>
-                Disconnect
-              </v-btn>
-            </v-col>
-            <v-col cols="12" md="4">
-              <v-select
-                v-model="selectedBaud"
-                :items="baudrateOptions"
-                label="Target baud rate"
-                density="comfortable"
-                :disabled="busy"
-              />
-            </v-col>
-          </v-row>
 
           <v-divider class="my-4" />
 
@@ -1146,6 +1150,25 @@ onBeforeUnmount(() => {
   .extra-details-value {
     text-align: left;
   }
+}
+
+.status-bar {
+  border-radius: 12px;
+  padding-inline: 12px;
+  border: 1px solid color-mix(in srgb, var(--v-theme-on-surface) 8%, transparent);
+}
+
+.status-bar .v-btn {
+  min-width: 130px;
+}
+
+.status-select {
+  min-width: 170px;
+  max-width: 200px;
+}
+
+.status-bar .v-divider {
+  height: 32px;
 }
 
 .partition-view {
