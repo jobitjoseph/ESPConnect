@@ -3,6 +3,35 @@
     Connect to an ESP32 to load its partition table.
   </div>
   <div v-else class="partition-view">
+    <v-alert
+      v-if="showUnusedAlert"
+      type="warning"
+      variant="tonal"
+      class="unused-alert"
+    >
+      <div>
+        Unused flash detected - about {{ unusedReadable }} ({{ unusedBytesDisplay }} bytes) is reclaimable.
+      </div>
+      <div>
+        See the
+        <a
+          href="https://youtu.be/EuHxodrye6E"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          partition tutorial
+        </a>
+        or try the
+        <a
+          href="https://thelastoutpostworkshop.github.io/microcontroller_devkit/esp32partitionbuilder/"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          ESP32 partition builder
+        </a>.
+      </div>
+    </v-alert>
+
     <div class="partition-map">
       <VTooltip
         v-for="segment in partitionSegments"
@@ -90,7 +119,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed, toRefs } from 'vue';
+
+const props = defineProps({
   partitionSegments: {
     type: Array,
     default: () => [],
@@ -99,7 +130,19 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  unusedSummary: {
+    type: Object,
+    default: null,
+  },
 });
+
+const { partitionSegments, formattedPartitions, unusedSummary } = toRefs(props);
+
+const showUnusedAlert = computed(() => Boolean(unusedSummary.value));
+const unusedReadable = computed(() => unusedSummary.value?.readable ?? '');
+const unusedBytesDisplay = computed(() =>
+  unusedSummary.value?.bytes != null ? unusedSummary.value.bytes.toLocaleString() : ''
+);
 </script>
 
 <style scoped>
@@ -212,6 +255,15 @@ defineProps({
   content: 'No partitions detected.';
   padding: 16px;
   color: color-mix(in srgb, var(--v-theme-on-surface) 60%, transparent);
+}
+
+.unused-alert {
+  margin-bottom: 8px;
+}
+
+.unused-alert a {
+  color: inherit;
+  text-decoration: underline;
 }
 </style>
 

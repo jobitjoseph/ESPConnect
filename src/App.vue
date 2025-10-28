@@ -105,6 +105,7 @@
               <PartitionsTab
                 :partition-segments="partitionSegments"
                 :formatted-partitions="formattedPartitions"
+                :unused-summary="unusedFlashSummary"
               />
             </v-window-item>
 
@@ -582,6 +583,8 @@ const partitionPalette = [
   '#ffc6ff',
 ];
 
+const UNUSED_FLASH_ALERT_THRESHOLD = 64 * 1024;
+
 const PARTITION_TYPE_NAMES = {
   0x00: 'Application',
   0x01: 'Data',
@@ -862,6 +865,24 @@ const partitionSegments = computed(() => {
       ],
     };
   });
+});
+
+const totalUnusedFlashBytes = computed(() =>
+  partitionSegments.value
+    .filter(segment => segment.isUnused)
+    .reduce((sum, segment) => sum + (segment.size || 0), 0)
+);
+
+const unusedFlashSummary = computed(() => {
+  const bytes = totalUnusedFlashBytes.value;
+  if (!bytes || bytes < UNUSED_FLASH_ALERT_THRESHOLD) {
+    return null;
+  }
+  const readable = formatBytes(bytes) ?? `${bytes} bytes`;
+  return {
+    bytes,
+    readable,
+  };
 });
 
 const formattedPartitions = computed(() => {
