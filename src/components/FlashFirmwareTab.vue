@@ -1,4 +1,14 @@
 <template>
+  <v-alert
+    type="warning"
+    variant="tonal"
+    border="start"
+    class="mb-4 advanced-warning"
+    density="comfortable"
+  >
+    Firmware tools are intended for advanced users. Writing or erasing flash can permanently remove data or render the device unbootable. Double-check settings before proceeding.
+  </v-alert>
+
   <v-row class="mb-2" dense>
     <v-col cols="12" md="8">
       <v-file-input
@@ -691,5 +701,10 @@ function handleRegisterSelect(value) {
 .register-info__link a {
   color: inherit;
   text-decoration: underline;
+}
+
+.advanced-warning {
+  font-size: 0.9rem;
+  line-height: 1.4;
 }
 </style>

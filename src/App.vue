@@ -1941,6 +1941,19 @@ async function flashFirmware() {
     return;
   }
 
+  const firmwareLabel = firmwareName.value || 'selected firmware';
+  const confirmationMessage =
+    `Flash ${firmwareLabel} at 0x${offsetNumber.toString(16).toUpperCase()}? ` +
+    'This will overwrite the target region and may erase existing data.';
+  const confirmFlash =
+    typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm(confirmationMessage)
+      : true;
+  if (!confirmFlash) {
+    appendLog('Firmware flash cancelled by user.', '[warn]');
+    return;
+  }
+
   flashInProgress.value = true;
   busy.value = true;
   flashProgress.value = 0;
@@ -2468,6 +2481,20 @@ async function handleEraseFlash(payload = { mode: 'full' }) {
     flashReadStatus.value = 'Selective erase is not yet supported in this interface.';
     return;
   }
+
+  const confirmErase =
+    typeof window !== 'undefined' && typeof window.confirm === 'function'
+      ? window.confirm(
+          'Erase entire flash? This action removes all data from the device and cannot be undone.'
+        )
+      : true;
+  if (!confirmErase) {
+    flashReadStatusType.value = 'info';
+    flashReadStatus.value = 'Flash erase cancelled.';
+    appendLog('Flash erase cancelled by user.', '[warn]');
+    return;
+  }
+
   try {
     maintenanceBusy.value = true;
     flashReadStatusType.value = 'info';
