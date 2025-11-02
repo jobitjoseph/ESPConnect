@@ -62,43 +62,46 @@
         </v-list-item>
       </v-list>
     </v-navigation-drawer>
-    <v-main>
-      <v-container class="py-10" max-width="1100">
-        <v-card elevation="8" class="pa-6">
-
-          <v-system-bar class="status-bar mb-4" color="primary" :height="64" dark window>
-            <div class="status-actions">
-              <v-btn
-                :class="['status-button', { 'status-button--active': !connected && !busy }]"
-                color="primary"
-                variant="outlined"
-                density="comfortable"
-                :disabled="!serialSupported || connected || busy"
-                @click="connect"
-              >
-                <v-icon start>mdi-usb-flash-drive</v-icon>
-                Connect
-              </v-btn>
-              <v-btn
-                :class="['status-button', { 'status-button--active': connected }]"
-                color="error"
-                variant="outlined"
-                density="comfortable"
-                :disabled="!connected || busy"
-                @click="disconnect"
-              >
-                <v-icon start>mdi-close-circle</v-icon>
-                Disconnect
-              </v-btn>
-              <v-select
-                v-model="selectedBaud"
-                :items="baudrateOptions"
-                label="Baud rate"
-                density="compact"
-                variant="outlined"
-                hide-details
-                class="status-select"
-                :disabled="busy || flashInProgress || maintenanceBusy || baudChangeBusy || monitorActive"
+    <v-app-bar
+      class="status-bar"
+      color="transparent"
+      app
+      flat
+      height="80"
+    >
+      <v-container class="status-bar__container" max-width="1100">
+        <div class="status-actions">
+          <v-btn
+            :class="['status-button', { 'status-button--active': !connected && !busy }]"
+            color="primary"
+            variant="outlined"
+            density="comfortable"
+            :disabled="!serialSupported || connected || busy"
+            @click="connect"
+          >
+            <v-icon start>mdi-usb-flash-drive</v-icon>
+            Connect
+          </v-btn>
+          <v-btn
+            :class="['status-button', { 'status-button--active': connected }]"
+            color="error"
+            variant="outlined"
+            density="comfortable"
+            :disabled="!connected || busy"
+            @click="disconnect"
+          >
+            <v-icon start>mdi-close-circle</v-icon>
+            Disconnect
+          </v-btn>
+          <v-select
+            v-model="selectedBaud"
+            :items="baudrateOptions"
+            label="Baud rate"
+            density="compact"
+            variant="outlined"
+            hide-details
+            class="status-select"
+            :disabled="busy || flashInProgress || maintenanceBusy || baudChangeBusy || monitorActive"
           />
         </div>
         <v-spacer />
@@ -137,8 +140,11 @@
           </template>
           {{ connectionChipLabel }}
         </v-chip>
-      </v-system-bar>
-
+      </v-container>
+    </v-app-bar>
+    <v-main>
+      <v-container class="py-10" max-width="1100">
+        <v-card elevation="8" class="pa-6">
           <v-alert
             v-if="!serialSupported"
             type="error"
@@ -3500,9 +3506,27 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .status-bar {
-  border-radius: 12px;
+  backdrop-filter: blur(22px);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--v-theme-surface) 88%, transparent) 0%,
+    color-mix(in srgb, var(--v-theme-surface) 70%, #04070c 30%) 100%
+  );
+  border-bottom: 1px solid color-mix(in srgb, var(--v-theme-primary) 18%, transparent);
+  box-shadow:
+    0 18px 26px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 12%, transparent);
+}
+
+.status-bar :deep(.v-toolbar__content) {
+  padding: 0;
+}
+
+.status-bar__container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
   padding-inline: 12px;
-  border: 1px solid color-mix(in srgb, #ffffff 15%, transparent);
 }
 
 .status-actions {
@@ -3546,10 +3570,6 @@ onBeforeUnmount(() => {
 .status-select {
   min-width: 180px;
   max-width: 220px;
-}
-
-.status-bar .v-divider {
-  height: 36px;
 }
 
 .confirmation-message {
