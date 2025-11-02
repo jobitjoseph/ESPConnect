@@ -1,5 +1,31 @@
 ﻿<template>
   <v-app>
+    <v-navigation-drawer
+      class="app-drawer"
+      color="surface"
+      permanent
+      app
+      width="260"
+      elevation="1"
+    >
+      <v-list nav density="comfortable" class="app-drawer__list">
+        <v-list-subheader class="app-drawer__label text-overline text-medium-emphasis">
+          Sections
+        </v-list-subheader>
+        <v-list-item
+          v-for="item in navigationItems"
+          :key="item.value"
+          :value="item.value"
+          :prepend-icon="item.icon"
+          :active="activeTab === item.value"
+          class="app-drawer__list-item"
+          rounded="lg"
+          @click="activeTab = item.value"
+        >
+          <v-list-item-title>{{ item.title }}</v-list-item-title>
+        </v-list-item>
+      </v-list>
+    </v-navigation-drawer>
     <v-main>
       <v-container class="py-10" max-width="1100">
         <v-card elevation="8" class="pa-6">
@@ -136,15 +162,7 @@
 
           <v-divider class="my-4" />
 
-          <v-tabs v-model="activeTab" class="mb-4" color="primary" grow>
-            <v-tab value="info">Device Info</v-tab>
-            <v-tab value="partitions">Partitions</v-tab>
-            <v-tab value="flash">Firmware Tools</v-tab>
-            <v-tab value="console">Serial Monitor</v-tab>
-            <v-tab value="log">Session Log</v-tab>
-          </v-tabs>
-
-          <v-window v-model="activeTab">
+          <v-window v-model="activeTab" class="app-tab-content">
             <v-window-item value="info">
               <DeviceInfoTab
                 :chip-details="chipDetails"
@@ -890,6 +908,13 @@ const firmwareName = ref('');
 const chipDetails = ref(null);
 const partitionTable = ref([]);
 const activeTab = ref('info');
+const navigationItems = [
+  { title: 'Device Info', value: 'info', icon: 'mdi-information-outline' },
+  { title: 'Partitions', value: 'partitions', icon: 'mdi-table' },
+  { title: 'Firmware Tools', value: 'flash', icon: 'mdi-chip' },
+  { title: 'Serial Monitor', value: 'console', icon: 'mdi-console-line' },
+  { title: 'Session Log', value: 'log', icon: 'mdi-clipboard-text-outline' },
+];
 const flashSizeBytes = ref(null);
 
 const showBootDialog = ref(false);
@@ -3539,6 +3564,36 @@ onBeforeUnmount(() => {
 
 .confirmation-message {
   white-space: pre-line;
+}
+
+.app-drawer {
+  border-right: 1px solid color-mix(in srgb, var(--v-theme-primary) 12%, transparent);
+}
+
+.app-drawer :deep(.v-navigation-drawer__content) {
+  padding-block: 24px;
+  padding-inline: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.app-drawer__label {
+  letter-spacing: 0.08em;
+}
+
+.app-drawer__list-item {
+  font-weight: 500;
+  text-transform: none;
+}
+
+.app-drawer :deep(.v-list-item--active) {
+  background-color: color-mix(in srgb, var(--v-theme-primary) 16%, transparent);
+  color: var(--v-theme-primary);
+}
+
+.app-tab-content {
+  min-height: 360px;
 }
 
 </style>
