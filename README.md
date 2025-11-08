@@ -13,6 +13,10 @@ ESPConnect is a browser-based control center for ESP32- and ESP8266-class boards
 3. After the handshake completes, the navigation drawer unlocks every tool: Device Info, Partitions, SPIFFS, Apps, Flash, Console, and Logs.  
 4. Use **Disconnect** whenever you want to free the USB port for another application.
 
+### LittleFS WASM module
+- If you build custom LittleFS tooling, drop the vendor `index.js`, `index.d.ts`, and `littlefs.wasm` into `public/wasm/littlefs/`.  
+- Those filenames are ignored by Git, so they stay local while the README inside that folder explains the expected layout.
+
 ## Feature Overview
 
 ### Device & flash awareness
