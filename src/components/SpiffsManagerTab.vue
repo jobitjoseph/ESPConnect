@@ -156,9 +156,6 @@
                 <span>Auto uploads on drop</span>
               </div>
             </div>
-            <div v-if="dragActive" class="spiffs-dropzone__overlay">
-              Release to upload
-            </div>
           </div>
         </div>
 
