@@ -3094,6 +3094,36 @@ function resolveEmbeddedFlash(chipKey, flashCap, flashVendor, featureList) {
   return null;
 }
 
+function extractCpuFrequency(featureList) {
+  if (!Array.isArray(featureList)) return null;
+  for (const feature of featureList) {
+    if (!feature) continue;
+    const match = String(feature).match(/(\d+)\s*mhz/i);
+    if (match) {
+      return `${match[1]} MHz`;
+    }
+  }
+  return null;
+}
+
+function extractCoreCount(featureList) {
+  if (!Array.isArray(featureList)) return null;
+  for (const feature of featureList) {
+    if (!feature) continue;
+    const normalized = String(feature).toLowerCase();
+    if (normalized.includes('single core')) {
+      return '1 (Single)';
+    }
+    if (normalized.includes('dual core')) {
+      return '2 (Dual)';
+    }
+    if (normalized.includes('quad core')) {
+      return '4 (Quad)';
+    }
+  }
+  return null;
+}
+
 function resolveEmbeddedPsram(chipKey, psramCap, psramVendor, featureList) {
   const map = EMBEDDED_PSRAM_CAPACITY[chipKey];
   if (map && typeof psramCap === 'number' && !Number.isNaN(psramCap) && map[psramCap]) {
@@ -5082,6 +5112,12 @@ async function connect() {
 
     const embeddedPsram = resolveEmbeddedPsram(chipKey, psramCap, psramVendor, featureList);
     pushFact('Embedded PSRAM', embeddedPsram);
+
+    const cpuFrequency = extractCpuFrequency(featureList);
+    pushFact('Max CPU Frequency', cpuFrequency);
+
+    const coreCount = extractCoreCount(featureList);
+    pushFact('CPU Cores', coreCount);
 
     if (flashVendor && !embeddedFlash) {
       pushFact('Flash Vendor (eFuse)', formatVendorLabel(flashVendor));

@@ -143,6 +143,8 @@ const primaryFacts = computed(() => {
     'Embedded Flash',
     'Embedded PSRAM',
     'Flash Device',
+    'CPU Cores',
+    'Max CPU Frequency',
     'Connection Baud',
     'USB Bridge',
   ];
