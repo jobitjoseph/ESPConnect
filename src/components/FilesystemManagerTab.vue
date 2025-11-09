@@ -59,7 +59,7 @@
     <v-card :variant="dragActive ? 'outlined' : 'tonal'">
       <v-card-title class="d-flex align-center justify-space-between">
         <span>Files</span>
-        <v-chip v-if="dirty" color="warning" size="large" variant="elevated">
+        <v-chip v-if="dirty" color="warning" size="large" variant="tonal">
           Unsaved changes
         </v-chip>
       </v-card-title>
