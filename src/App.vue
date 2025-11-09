@@ -3424,7 +3424,7 @@ const activeTab = ref('info');
 const sessionLogRef = ref(null);
 const navigationItems = computed(() => [
   { title: 'Device Info', value: 'info', icon: 'mdi-information-outline', disabled: false },
-  { title: 'Partitions', value: 'partitions', icon: 'mdi-table', disabled: false },
+  { title: 'Partitions', value: 'partitions', icon: 'mdi-table', disabled: !connected.value },
   {
     title: 'Apps',
     value: 'apps',
@@ -3449,7 +3449,7 @@ const navigationItems = computed(() => [
     icon: 'mdi-alpha-f-circle-outline',
     disabled: !connected.value || !fatfsAvailable.value,
   },
-  { title: 'Firmware Tools', value: 'flash', icon: 'mdi-chip', disabled: false },
+  { title: 'Firmware Tools', value: 'flash', icon: 'mdi-chip', disabled: !connected.value },
   { title: 'Serial Monitor', value: 'console', icon: 'mdi-console-line', disabled: false },
   { title: 'Session Log', value: 'log', icon: 'mdi-clipboard-text-outline', disabled: false },
   {
@@ -4872,6 +4872,7 @@ async function disconnectTransport() {
     fatfsState.selectedId = null;
     currentBaud.value = DEFAULT_FLASH_BAUD;
     baudChangeBusy.value = false;
+    activeTab.value = 'info';
   }
 }
 
