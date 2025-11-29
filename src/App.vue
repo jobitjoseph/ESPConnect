@@ -4703,8 +4703,9 @@ async function connect() {
       typeof flashId === 'number' && Number.isFinite(flashId) ? (flashId >> 8) & 0xff : null;
     const capacityCodeRaw =
       typeof flashId === 'number' && Number.isFinite(flashId) ? (flashId >> 16) & 0xff : null;
+    const flashSizeLabel = typeof flashSizeRaw === 'string' ? flashSizeRaw : null;
     appendLog(
-      `Flash detect raw: getFlashSize=${Number.isFinite(flashSizeRaw) ? `${flashSizeRaw}` : 'n/a'}, flashId=${typeof flashId === 'number' && Number.isFinite(flashId) ? `0x${flashId
+      `Flash detect raw: getFlashSize=${flashSizeLabel ?? 'n/a'}, flashId=${typeof flashId === 'number' && Number.isFinite(flashId) ? `0x${flashId
         .toString(16)
         .padStart(6, '0')
         .toUpperCase()}` : 'n/a'} (manuf=0x${Number.isInteger(manufacturerCode)
@@ -4728,12 +4729,18 @@ async function connect() {
         feature => typeof feature === 'string' && feature.toUpperCase().includes('OCTAL')
       );
 
-    const flashSizeKb = typeof flashSizeRaw === 'number' ? flashSizeRaw : null;
-    let flashBytesValue = null;
+    const parseFlashSizeLabel = label => {
+      if (!label || typeof label !== 'string') return null;
+      const match = label.match(/(\d+(?:\.\d+)?)\s*(MB|KB)/i);
+      if (!match) return null;
+      const value = Number.parseFloat(match[1]);
+      if (!Number.isFinite(value) || value <= 0) return null;
+      return match[2].toUpperCase() === 'MB' ? value * 1024 * 1024 : value * 1024;
+    };
+
+    let flashBytesValue = parseFlashSizeLabel(flashSizeLabel);
     let flashLabelSuffix = '';
-    if (typeof flashSizeKb === 'number' && flashSizeKb > 0) {
-      flashBytesValue = flashSizeKb * 1024;
-    } else {
+    if (!flashBytesValue) {
       const capacityCandidates = [capacityCodeRaw, memoryTypeCode, manufacturerCode].filter(
         value =>
           Number.isInteger(value) &&
