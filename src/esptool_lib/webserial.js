@@ -45,11 +45,13 @@ class Transport {
      * @param {string} message Message to format as trace line.
      */
     trace(message) {
-        const delta = Date.now() - this.lastTraceTime;
-        const prefix = `TRACE ${delta.toFixed(3)}`;
-        const traceMessage = `${prefix} ${message}`;
-        console.log(traceMessage);
-        this.traceLog += traceMessage + "\n";
+        if(this.tracing) {
+            const delta = Date.now() - this.lastTraceTime;
+            const prefix = `TRACE ${delta.toFixed(3)}`;
+            const traceMessage = `${prefix} ${message}`;
+            console.log(traceMessage);
+            this.traceLog += traceMessage + "\n";
+        }
     }
     async returnTrace() {
         try {
