@@ -404,29 +404,43 @@ function handleDrop(event) {
   if (props.readOnly || !props.hasClient || props.loading || props.busy || props.saving) return;
   dragActive.value = false;
   const items = Array.from(event.dataTransfer?.items ?? []);
-  if (!items.length) return;
-  processDroppedItems(items);
+  const files = Array.from(event.dataTransfer?.files ?? []);
+  if (!items.length && !files.length) return;
+  processDroppedItems(items, files);
 }
 
-async function processDroppedItems(items) {
-  const uploadEntries = [];
+async function processDroppedItems(items, fallbackFiles = []) {
+  const entryMap = new Map(); // path -> payload
   const filesForSizeCheck = [];
+
+  async function readAllEntries(reader) {
+    const out = [];
+    async function readChunk() {
+      const entries = await new Promise((resolve, reject) => {
+        reader.readEntries(resolve, reject);
+      });
+      if (entries.length) {
+        out.push(...entries);
+        await readChunk();
+      }
+    }
+    await readChunk();
+    return out;
+  }
 
   async function traverseEntry(entry, pathPrefix = '') {
     if (!entry) return;
     if (entry.isFile) {
       const file = await new Promise(resolve => entry.file(resolve));
       const relPath = pathPrefix ? `${pathPrefix}/${file.name}` : file.name;
-      uploadEntries.push({ file, path: relPath });
+      entryMap.set(relPath, { file, path: relPath });
       filesForSizeCheck.push({ size: file.size, path: relPath });
     } else if (entry.isDirectory) {
       const reader = entry.createReader();
-      const entries = await new Promise((resolve, reject) => {
-        reader.readEntries(resolve, reject);
-      });
+      const entries = await readAllEntries(reader);
       const prefix = pathPrefix ? `${pathPrefix}/${entry.name}` : entry.name;
       if (!entries.length) {
-        uploadEntries.push({ file: null, path: prefix, isDir: true });
+        entryMap.set(prefix, { file: null, path: prefix, isDir: true });
       }
       for (const child of entries) {
         await traverseEntry(child, prefix);
@@ -441,15 +455,34 @@ async function processDroppedItems(items) {
     } else {
       const file = item.getAsFile();
       if (file) {
-        uploadEntries.push({ file, path: file.name });
+        entryMap.set(file.name, { file, path: file.name });
         filesForSizeCheck.push({ size: file.size, path: file.name });
       }
     }
   }
 
+  // Always merge plain FileList to catch items not exposed via webkit entries
+  for (const file of fallbackFiles) {
+    if (!entryMap.has(file.name)) {
+      entryMap.set(file.name, { file, path: file.name });
+      filesForSizeCheck.push({ size: file.size, path: file.name });
+    }
+  }
+
+  console.info(
+    '[ESPConnect-LittleFS] drop items:',
+    Array.from(entryMap.values()).map(e => `${e.isDir ? 'dir' : 'file'} ${e.path}`),
+    'totalFiles:',
+    filesForSizeCheck.length,
+    'rawItems:',
+    items.length,
+    'fallbackFiles:',
+    fallbackFiles.length,
+  );
+
   const totalSize = filesForSizeCheck.reduce((sum, f) => sum + (f.size || 0), 0);
 
-  for (const entry of uploadEntries) {
+  for (const entry of entryMap.values()) {
     emit('upload-file', { ...entry, bundleTotal: totalSize });
   }
 }

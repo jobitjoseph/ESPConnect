@@ -1158,9 +1158,13 @@ function handleLittlefsUploadSelection(file) {
 
 async function handleLittlefsUpload(payload) {
   const { file, path, isDir } = payload || {};
-  // reset block flags for a new upload attempt
-  littlefsState.uploadBlocked = false;
-  littlefsState.uploadBlockedReason = '';
+  // For ad-hoc uploads (single file), clear any previous block; for bundled drops, respect existing block.
+  if (!payload?.bundleTotal) {
+    littlefsState.uploadBlocked = false;
+    littlefsState.uploadBlockedReason = '';
+  } else if (littlefsState.uploadBlocked) {
+    return;
+  }
   if (!littlefsState.client) return;
   if (littlefsState.readOnly) {
     littlefsState.status = littlefsState.readOnlyReason || 'LittleFS is read-only.';
@@ -1177,8 +1181,18 @@ async function handleLittlefsUpload(payload) {
   const partition = littlefsSelectedPartition.value;
   const partitionSize = partition?.size ?? littlefsState.blockSize * littlefsState.blockCount;
   const usedBytes = littlefsState.files.reduce((sum, entry) => sum + (entry.size ?? 0), 0);
+  let freeBytes = partitionSize ? partitionSize - usedBytes : Number.POSITIVE_INFINITY;
   const bundleTotal = payload?.bundleTotal ?? 0;
-  if (partitionSize && bundleTotal > 0 && bundleTotal > partitionSize - usedBytes) {
+  console.info('[ESPConnect-LittleFS] upload start', {
+    path,
+    name: file?.name,
+    size: file?.size,
+    isDir,
+    bundleTotal,
+    freeBytes,
+    currentPath: littlefsState.currentPath,
+  });
+  if (partitionSize && bundleTotal > 0 && bundleTotal > freeBytes) {
     const message =
       'Not enough LittleFS space for this upload. Delete files or format the partition, then try again.';
     littlefsState.uploadBlocked = true;
@@ -1204,14 +1218,21 @@ async function handleLittlefsUpload(payload) {
   // size check using handleLittlefsUploadSelection logic
   const targetPath = joinFsPath(littlefsState.currentPath || '/', path || targetName);
   const existingSize = littlefsState.files.find(entry => entry.path === targetPath)?.size ?? 0;
-  const availableBytes = partitionSize ? partitionSize - usedBytes + existingSize : 0;
-  if (partitionSize && file.size > availableBytes) {
+  const availableBytes = partitionSize ? freeBytes + existingSize : Number.POSITIVE_INFINITY;
+  if (file.size > availableBytes) {
     const message =
       'Not enough LittleFS space for this upload. Delete files or format the partition, then try again.';
     littlefsState.uploadBlocked = true;
     littlefsState.uploadBlockedReason = message;
     littlefsState.status = message;
     showUploadError(message);
+    console.warn('[ESPConnect-LittleFS] upload blocked file', {
+      targetPath,
+      size: file.size,
+      existingSize,
+      availableBytes,
+      freeBytes,
+    });
     return;
   }
 
@@ -1241,6 +1262,12 @@ async function handleLittlefsUpload(payload) {
     await refreshLittlefsListing();
     markLittlefsDirty(`Staged ${target}. Remember to Save.`);
     appendLog(`LittleFS staged ${target} (${data.length.toLocaleString()} bytes).`, '[ESPConnect-Debug]');
+    freeBytes = Math.max(0, freeBytes - Math.max(file.size - existingSize, 0));
+    console.info('[ESPConnect-LittleFS] upload success', {
+      target,
+      size: file.size,
+      freeBytesRemaining: freeBytes,
+    });
   } catch (error) {
     littlefsState.error = formatErrorMessage(error);
     showToast(littlefsState.error, { color: 'error' });
