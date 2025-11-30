@@ -60,6 +60,7 @@ export function useLittlefsManager(defaultBlockSize: number) {
     selectedId: null as number | null,
     client: null as unknown,
     files: [] as Array<{ name?: string; size?: number }>,
+    currentPath: '/' as string,
     status: 'Load a LittleFS partition to begin.',
     loading: false,
     busy: false,

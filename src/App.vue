@@ -100,23 +100,24 @@
             </v-window-item>
 
             <v-window-item value="littlefs">
-              <FilesystemManagerTab v-if="connected && littleFsAvailable" :partitions="littleFsPartitions"
-                :selected-partition-id="littlefsState.selectedId" :files="littlefsState.files"
-                :status="littlefsState.status" :loading="littlefsState.loading" :busy="littlefsState.busy"
-                :saving="littlefsState.saving" :read-only="littlefsState.readOnly"
-                :read-only-reason="littlefsState.readOnlyReason" :dirty="littlefsState.dirty"
-                :backup-done="littlefsState.backupDone || littlefsState.sessionBackupDone" :error="littlefsState.error"
-                :has-partition="hasLittlefsPartitionSelected" :has-client="Boolean(littlefsState.client)"
-                :usage="littlefsState.usage" :upload-blocked="littlefsState.uploadBlocked"
-                :upload-blocked-reason="littlefsState.uploadBlockedReason" fs-label="LittleFS"
-                :load-cancelled="littlefsState.loadCancelled" partition-title="LittleFS Partition"
+              <LittlefsManagerTab v-if="connected && littleFsAvailable" :partitions="littleFsPartitions"
+                :selected-partition-id="littlefsState.selectedId" :files="littlefsVisibleFiles"
+                :current-path="littlefsState.currentPath" :status="littlefsState.status"
+                :loading="littlefsState.loading" :busy="littlefsState.busy" :saving="littlefsState.saving"
+                :read-only="littlefsState.readOnly" :read-only-reason="littlefsState.readOnlyReason"
+                :dirty="littlefsState.dirty" :backup-done="littlefsState.backupDone || littlefsState.sessionBackupDone"
+                :error="littlefsState.error" :has-partition="hasLittlefsPartitionSelected"
+                :has-client="Boolean(littlefsState.client)" :usage="littlefsState.usage"
+                :upload-blocked="littlefsState.uploadBlocked" :upload-blocked-reason="littlefsState.uploadBlockedReason"
+                fs-label="LittleFS" :load-cancelled="littlefsState.loadCancelled" partition-title="LittleFS Partition"
                 empty-state-message="No LittleFS files found. Read the partition or upload to begin."
                 :is-file-viewable="isViewableSpiffsFile" :get-file-preview-info="resolveSpiffsViewInfo"
                 @select-partition="handleSelectLittlefsPartition" @refresh="handleRefreshLittlefs"
                 @backup="handleLittlefsBackup" @restore="handleLittlefsRestore"
                 @download-file="handleLittlefsDownloadFile" @view-file="handleLittlefsView"
                 @validate-upload="handleLittlefsUploadSelection" @upload-file="handleLittlefsUpload"
-                @delete-file="handleLittlefsDelete" @format="handleLittlefsFormat" @save="handleLittlefsSave" />
+                @delete-file="handleLittlefsDelete" @format="handleLittlefsFormat" @save="handleLittlefsSave"
+                @navigate="handleLittlefsNavigate" @navigate-up="handleLittlefsNavigateUp" @new-folder="handleLittlefsNewFolder" />
               <DisconnectedState v-else icon="mdi-alpha-l-circle-outline" :min-height="420"
                 subtitle="Connect to an ESP32 with a LittleFS partition to use these tools." />
             </v-window-item>
@@ -580,6 +581,7 @@ import DeviceInfoTab from './components/DeviceInfoTab.vue';
 import FlashFirmwareTab from './components/FlashFirmwareTab.vue';
 import AppsTab from './components/AppsTab.vue';
 import FilesystemManagerTab from './components/FilesystemManagerTab.vue';
+import LittlefsManagerTab from './components/LittlefsManagerTab.vue';
 import AboutTab from './components/AboutTab.vue';
 import PartitionsTab from './components/PartitionsTab.vue';
 import SessionLogTab from './components/SessionLogTab.vue';
@@ -676,6 +678,35 @@ function resolveLittlefsModuleUrl() {
   return url.toString();
 }
 
+function normalizeFsPath(path = '/') {
+  let p = path || '/';
+  p = p.startsWith('/') ? p : `/${p}`;
+  p = p.replace(/\/+/g, '/');
+  if (p.length > 1 && p.endsWith('/')) {
+    p = p.slice(0, -1);
+  }
+  return p || '/';
+}
+
+function isDirectChildPath(childPath, basePath) {
+  const child = normalizeFsPath(childPath);
+  const base = normalizeFsPath(basePath);
+  if (base === '/') {
+    return child.split('/').filter(Boolean).length === 1;
+  }
+  if (!child.startsWith(base + '/')) return false;
+  const remaining = child.slice(base.length);
+  const segments = remaining.split('/').filter(Boolean);
+  return segments.length === 1;
+}
+
+function joinFsPath(basePath, name) {
+  const base = normalizeFsPath(basePath);
+  const cleanedName = String(name || '').replace(/\/+/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
+  if (!cleanedName) return base;
+  return normalizeFsPath(`${base}/${cleanedName}`);
+}
+
 async function loadFatfsModule() {
   if (!fatfsModulePromise) {
     const base = typeof window !== 'undefined' && window.location ? window.location.href : import.meta.url;
@@ -696,14 +727,22 @@ function normalizeLittlefsEntries(entries) {
   }
   return entries
     .map(entry => {
-      const rawName = (entry?.name ?? entry?.path ?? '').toString();
-      const name = rawName.replace(/^\/+/, '');
-      const isDir = entry?.isDirectory === true || entry?.type === 'dir';
-      if (!name || isDir || name.includes('/')) {
-        return null; // ignore root entry and nested paths to keep flat view
+      const rawPath = (entry?.path ?? entry?.name ?? '').toString();
+      let path = rawPath.startsWith('/') ? rawPath : `/${rawPath}`;
+      path = path.replace(/\/+/g, '/');
+      if (path !== '/' && path.endsWith('/')) {
+        path = path.slice(0, -1);
       }
+      if (!path || path === '/') {
+        return null;
+      }
+      const segments = path.split('/').filter(Boolean);
+      const name = segments[segments.length - 1] || '';
+      const isDir = entry?.isDirectory === true || entry?.type === 'dir';
       return {
         name,
+        path,
+        type: isDir ? 'dir' : 'file',
         size: Number(entry?.size ?? 0) || 0,
       };
     })
@@ -869,7 +908,8 @@ async function loadLittlefsPartition(partition) {
       return;
     }
     littlefsState.client = client;
-    const entries = client.list?.() ?? [];
+    littlefsState.currentPath = '/';
+    const entries = client.list?.('/') ?? [];
     littlefsState.files = normalizeLittlefsEntries(entries);
     littlefsState.baselineFiles = littlefsState.files.map(file => ({ ...file }));
     littlefsState.dirty = false;
@@ -921,7 +961,7 @@ async function refreshLittlefsListing() {
   if (!littlefsState.client) {
     return;
   }
-  const entries = littlefsState.client.list?.() ?? [];
+  const entries = littlefsState.client.list?.('/') ?? [];
   littlefsState.files = normalizeLittlefsEntries(entries);
   updateLittlefsUsage();
 }
@@ -933,6 +973,7 @@ function handleSelectLittlefsPartition(partitionId) {
   littlefsState.selectedId = partitionId;
   littlefsState.client = null;
   littlefsState.files = [];
+  littlefsState.currentPath = '/';
   littlefsState.status = 'Loading LittleFS...';
   const partition = littleFsPartitions.value.find(entry => entry.id === partitionId) ?? littleFsPartitions.value[0];
   if (partition) {
@@ -1064,10 +1105,11 @@ function handleLittlefsUploadSelection(file) {
     littlefsState.uploadBlockedReason = '';
     return;
   }
+  const targetPath = joinFsPath(littlefsState.currentPath || '/', file.name);
   const partition = littlefsSelectedPartition.value;
   const partitionSize = partition?.size ?? littlefsState.blockSize * littlefsState.blockCount;
   const usedBytes = littlefsState.files.reduce((sum, entry) => sum + (entry.size ?? 0), 0);
-  const existingSize = littlefsState.files.find(entry => entry.name === file.name)?.size ?? 0;
+  const existingSize = littlefsState.files.find(entry => entry.path === targetPath)?.size ?? 0;
   const availableBytes = partitionSize ? partitionSize - usedBytes + existingSize : 0;
   if (partitionSize && file.size > availableBytes) {
     const message =
@@ -1111,10 +1153,15 @@ async function handleLittlefsUpload({ file }) {
   try {
     littlefsState.busy = true;
     const data = new Uint8Array(await file.arrayBuffer());
-    littlefsState.client.addFile(targetName, data);
+    const targetPath = joinFsPath(littlefsState.currentPath || '/', targetName);
+    if (typeof littlefsState.client.writeFile === 'function') {
+      littlefsState.client.writeFile(targetPath, data);
+    } else if (typeof littlefsState.client.addFile === 'function') {
+      littlefsState.client.addFile(targetPath, data);
+    }
     await refreshLittlefsListing();
-    markLittlefsDirty(`Staged ${targetName}. Remember to Save.`);
-    appendLog(`LittleFS staged ${targetName} (${data.length.toLocaleString()} bytes).`, '[ESPConnect-Debug]');
+    markLittlefsDirty(`Staged ${targetPath}. Remember to Save.`);
+    appendLog(`LittleFS staged ${targetPath} (${data.length.toLocaleString()} bytes).`, '[ESPConnect-Debug]');
   } catch (error) {
     littlefsState.error = formatErrorMessage(error);
     showToast(littlefsState.error, { color: 'error' });
@@ -1127,9 +1174,10 @@ async function handleLittlefsDelete(name) {
   if (!littlefsState.client || littlefsState.readOnly) {
     return;
   }
+  const targetPath = normalizeFsPath(name);
   const confirmed = await showConfirmation({
     title: 'Delete File',
-    message: `Delete ${name} from LittleFS? This cannot be undone.`,
+    message: `Delete ${targetPath} from LittleFS? This cannot be undone.`,
     confirmText: 'Delete',
     destructive: true,
   });
@@ -1138,10 +1186,56 @@ async function handleLittlefsDelete(name) {
   }
   try {
     littlefsState.busy = true;
-    littlefsState.client.deleteFile(name);
+    if (typeof littlefsState.client.delete === 'function') {
+      littlefsState.client.delete(targetPath, { recursive: false });
+    } else if (typeof littlefsState.client.deleteFile === 'function') {
+      littlefsState.client.deleteFile(targetPath);
+    }
     await refreshLittlefsListing();
-    markLittlefsDirty(`${name} deleted. Save to persist.`);
-    appendLog(`LittleFS staged deletion of ${name}.`, '[ESPConnect-Debug]');
+    markLittlefsDirty(`${targetPath} deleted. Save to persist.`);
+    appendLog(`LittleFS staged deletion of ${targetPath}.`, '[ESPConnect-Debug]');
+  } catch (error) {
+    littlefsState.error = formatErrorMessage(error);
+  } finally {
+    littlefsState.busy = false;
+  }
+}
+
+async function handleLittlefsNavigate(path) {
+  const target = normalizeFsPath(path || '/');
+  if (littlefsState.currentPath === target || !littlefsState.client) return;
+  littlefsState.currentPath = target;
+  await refreshLittlefsListing();
+}
+
+async function handleLittlefsNavigateUp() {
+  const current = normalizeFsPath(littlefsState.currentPath || '/');
+  if (current === '/') return;
+  const segments = current.split('/').filter(Boolean);
+  segments.pop();
+  const parent = segments.length ? `/${segments.join('/')}` : '/';
+  await handleLittlefsNavigate(parent);
+}
+
+async function handleLittlefsNewFolder() {
+  if (!littlefsState.client || littlefsState.readOnly) return;
+  const name = prompt('New folder name');
+  if (!name) return;
+  if (name.includes('/') || name.includes('..')) {
+    showToast('Folder name cannot contain slashes or "..".', { color: 'warning' });
+    return;
+  }
+  const targetPath = joinFsPath(littlefsState.currentPath || '/', name);
+  try {
+    littlefsState.busy = true;
+    if (typeof littlefsState.client.mkdir === 'function') {
+      littlefsState.client.mkdir(targetPath);
+    } else {
+      showToast('mkdir is not available in the LittleFS client.', { color: 'error' });
+      return;
+    }
+    await refreshLittlefsListing();
+    markLittlefsDirty(`Created folder ${targetPath}. Save to persist.`);
   } catch (error) {
     littlefsState.error = formatErrorMessage(error);
   } finally {
@@ -1243,12 +1337,12 @@ async function handleLittlefsSave() {
   }
 }
 
-async function readLittlefsFile(name) {
+async function readLittlefsFile(path) {
   if (!littlefsState.client) {
     throw new Error('LittleFS client unavailable.');
   }
-  if (!name) {
-    throw new Error('File name is required.');
+  if (!path) {
+    throw new Error('File path is required.');
   }
   const reader =
     typeof littlefsState.client.readFile === 'function'
@@ -1259,7 +1353,7 @@ async function readLittlefsFile(name) {
   if (!reader) {
     throw new Error('LittleFS module does not support per-file reads. Update the WASM bundle.');
   }
-  const result = reader.call(littlefsState.client, name);
+  const result = reader.call(littlefsState.client, path);
   const data = result instanceof Promise ? await result : result;
   if (!(data instanceof Uint8Array)) {
     throw new Error('LittleFS read returned unexpected data.');
@@ -1267,20 +1361,22 @@ async function readLittlefsFile(name) {
   return data;
 }
 
-async function handleLittlefsDownloadFile(name) {
-  if (!littlefsState.client || !name) return;
+async function handleLittlefsDownloadFile(path) {
+  if (!littlefsState.client || !path) return;
   try {
-    const data = await readLittlefsFile(name);
+    const data = await readLittlefsFile(path);
+    const name = path.split('/').filter(Boolean).pop() || 'file.bin';
     saveBinaryFile(name, data);
-    appendLog(`LittleFS downloaded ${name} (${data.length.toLocaleString()} bytes).`, '[ESPConnect-Debug]');
+    appendLog(`LittleFS downloaded ${path} (${data.length.toLocaleString()} bytes).`, '[ESPConnect-Debug]');
   } catch (error) {
     littlefsState.error = formatErrorMessage(error);
     littlefsState.status = 'LittleFS download failed.';
   }
 }
 
-async function handleLittlefsView(name) {
+async function handleLittlefsView(path) {
   if (!littlefsState.client) return;
+  const name = path.split('/').filter(Boolean).pop() || path;
   const viewInfo = resolveSpiffsViewInfo(name);
   if (!viewInfo) {
     littlefsState.status = 'This file type cannot be previewed. Download it instead.';
@@ -1289,7 +1385,7 @@ async function handleLittlefsView(name) {
   }
   resetViewerMedia();
   spiffsViewerDialog.visible = true;
-  spiffsViewerDialog.name = name;
+  spiffsViewerDialog.name = path;
   spiffsViewerDialog.loading = true;
   spiffsViewerDialog.error = null;
   spiffsViewerDialog.content = '';
@@ -2028,6 +2124,7 @@ function resetLittlefsState() {
   littlefsState.selectedId = null;
   littlefsState.client = null;
   littlefsState.files = [];
+  littlefsState.currentPath = '/';
   littlefsState.status = 'Load a LittleFS partition to begin.';
   littlefsState.loading = false;
   littlefsState.busy = false;
@@ -2040,6 +2137,7 @@ function resetLittlefsState() {
   littlefsState.backupDone = false;
   littlefsState.sessionBackupDone = false;
   littlefsState.baselineFiles = [];
+  littlefsState.currentPath = '/';
   littlefsState.usage = {
     capacityBytes: 0,
     usedBytes: 0,
@@ -2049,6 +2147,7 @@ function resetLittlefsState() {
   littlefsState.uploadBlockedReason = '';
   littlefsState.blockSize = 0;
   littlefsState.blockCount = 0;
+  littlefsState.currentPath = '/';
 }
 
 function updateLittlefsUsage(partition = littlefsSelectedPartition.value) {
@@ -2248,8 +2347,8 @@ function computeSpiffsDiff() {
 }
 
 function computeFileDiff(baselineFiles = [], currentFiles = []) {
-  const baselineMap = new Map(baselineFiles.map(file => [file.name, file.size]));
-  const currentMap = new Map(currentFiles.map(file => [file.name, file.size]));
+  const baselineMap = new Map(baselineFiles.map(file => [(file.path || file.name), file.size]));
+  const currentMap = new Map(currentFiles.map(file => [(file.path || file.name), file.size]));
   const added = [];
   const removed = [];
   const modified = [];
@@ -3046,6 +3145,10 @@ const littleFsPartitions = computed(() =>
     })),
 );
 const littleFsAvailable = computed(() => littleFsPartitions.value.length > 0);
+const littlefsVisibleFiles = computed(() => {
+  const base = normalizeFsPath(littlefsState.currentPath || '/');
+  return littlefsState.files.filter(entry => isDirectChildPath(entry.path, base));
+});
 const fatfsPartitions = computed(() =>
   partitionTable.value
     .filter(entry => {
