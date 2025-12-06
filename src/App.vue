@@ -5127,7 +5127,7 @@ async function connect() {
     }
 
     connectDialog.message = 'Handshaking with ROM bootloader...';
-    const { chipName, chipFamily, macAddress: handshakeMac } = await esptool.connectAndHandshake();
+    const { chipName, macAddress: handshakeMac } = await esptool.connectAndHandshake();
     currentBaud.value = desiredBaud || connectBaud;
     transport.value.baudrate = currentBaud.value;
     const previousSuspendState = suspendBaudWatcher;

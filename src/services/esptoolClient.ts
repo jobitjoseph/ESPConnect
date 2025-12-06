@@ -435,7 +435,7 @@ export function createEsptoolClient({
       const chipFamily = loader.getChipFamily();
 
       status('Reading chip information...');
-      return { chipName, chipFamily, macAddress };
+      return { chipName, macAddress };
     } finally {
       setBusy(false);
     }
