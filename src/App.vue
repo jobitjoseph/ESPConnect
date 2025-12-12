@@ -3216,6 +3216,16 @@ type DownloadFlashOptions = {
   onProgress?: (progress: WriteFilesystemProgress) => void;
 };
 
+type DownloadFlashPayload = {
+  mode: string;
+  partition?: any;
+  partitions?: any[];
+  offset?: number;
+  length?: number;
+  label?: string;
+  fileName?: string;
+};
+
 // Write a filesystem image to flash with progress callbacks.
 async function writeFilesystemImage(partition: any, image: Uint8Array | ArrayBuffer, options: WriteFilesystemOptions = {}) {
   const { onProgress, label = 'filesystem', state, compress = true } = options;
@@ -6027,7 +6037,7 @@ async function downloadFlashRegion(offset: number, length: number, options: Down
 }
 
 // Handle flash download flows (manual, partition, all, used, custom).
-async function handleDownloadFlash(payload = { mode: 'manual' }) {
+async function handleDownloadFlash(payload: DownloadFlashPayload = { mode: 'manual' }) {
   if (!loader.value) {
     flashReadStatus.value = 'Connect to a device first.';
     flashReadStatusType.value = 'warning';
